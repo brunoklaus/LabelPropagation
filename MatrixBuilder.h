@@ -1,6 +1,6 @@
 #pragma once
 #include "globals.h"
-
+#include<limits>
 
 Mat build_LG_S(Mat &X, double sigma){
 		Mat W (X.rows(), X.rows());
@@ -81,5 +81,52 @@ Mat build_LG_P(Mat &X, double sigma){
 		}
 
 		return (D*W);
+}
+
+
+Mat build_KNN_Mat(Mat &X, int k){
+		Mat W (X.rows(), X.rows());
+		Mat K (X.rows(), X.rows());
+
+		for (int i = 0; i < X.rows(); i++) {
+			for (int j = 0; j < X.rows(); j++) {
+				RVec v = (X.row(i) - X.row(j));
+				double d = v.squaredNorm();
+				W(i,j) = d;
+			}
+		}
+
+
+		for (int i = 0; i < X.rows(); i++) {
+			bool* used = (bool*) calloc(X.rows(),sizeof(bool));
+
+			for (int l = 0; l < k; l++) {
+				int minIndex = -1;
+				double minVal = std::numeric_limits<double>::max();
+
+				for (int j = l; j < X.rows(); j++) {
+					if (used[j] == true){
+						continue;
+					}
+					if (W(i,j) < minVal) {
+						minVal = W(i,j);
+						minIndex = j;
+					}
+				}
+				K(i,minIndex) = 1.0;
+				used[minIndex] = true;
+
+			}
+			free(used);
+		}
+		if (F_DEBUG) {
+			for (int i = 0; i < X.rows(); i++) {
+				if (K.row(i).sum() != k) {
+					throw std::logic_error(std::string("KNN matrix with row sum different than k - row ") +
+							 std::to_string(i) + std::string(", sum ") + std::to_string(K.row(i).sum()));
+				}
+			}
+		}
+		return K;
 }
 

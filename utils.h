@@ -1,5 +1,9 @@
 #pragma once
 #include"globals.h"
+
+CVec getClassFreq(CVec M);
+
+
 /**
  * Retorna Matrizes com pontos e rotulos de um arquivo
  * @param inputFolder - endereco da pasta do arquivo
@@ -84,16 +88,30 @@ std::vector<int> getSamples(int N, int M, CVec Y) {
 	}
 	std::random_shuffle(vec.begin(),vec.end());
 	std::vector<int> vec2;
+	CVec classes(M);
 
 	int* count = (int*) calloc(NUM_CLASSES, sizeof(int));
 
-	for (int i = 0; i < M; i++) {
+	int* maxAllowed = (int*) calloc(NUM_CLASSES, sizeof(int));
+	maxAllowed[0] = M -  (NUM_CLASSES-1)*(M/NUM_CLASSES);
+	for (int i = 1; i < NUM_CLASSES; i++) {
+		maxAllowed[i] = M/NUM_CLASSES;
+	}
+
+
+	for (int i = 0; i < N && vec2.size() != M; i++) {
 		int c = std::round(Y[vec[i]]);
-		if (count[c] > M/NUM_CLASSES) {
+		if (count[c] + 1 > maxAllowed[c]) {
 			continue;
 		}
 		vec2.push_back(vec[i]);
-		count[c]++;
+		classes(vec2.size()-1) = c;
+		count[c] = count[c] + 1;
+	}
+	free(count);
+	free(maxAllowed);
+	if(F_DEBUG){
+		std::cout <<"Sample class frequency: " << getClassFreq(classes).transpose() << std::endl;
 	}
 	return vec2;
 }
@@ -122,7 +140,7 @@ Mat getInitialProb(CVec Y, std::vector<int> samples){
 	}
 
 	for (int i = 0; i < samples.size(); i++) {
-		Init(samples[i], Y(samples[i]) ) = 1.0;
+		Init(samples[i], std::round(Y(samples[i])))  = 1.0;
 	}
 
 	return Init;
@@ -144,7 +162,7 @@ CVec getClassification(Mat probs) {
 	return classification;
 }
 
-double getErrorRate(CVec Y, CVec classification) {
+double getErrorRate(CVec &Y, CVec &classification) {
 	double count = 0;
 	for (int i = 0; i < Y.rows(); i++) {
 		if (std::round(Y(i)) != std::round(classification(i)) ) {
@@ -152,4 +170,50 @@ double getErrorRate(CVec Y, CVec classification) {
 		}
 	}
 	return count/(double) Y.rows();
+}
+
+void checkFinite(Mat& M){
+	for (int i = 0; i < M.rows();i++){
+		for (int j = 0; j < M.cols();j++) {
+			if (!std::isfinite(M(i,j))) {
+				throw std::logic_error("Non-finite value found in matrix\n");
+			}
+		}
+	}
+}
+
+double getProbabilisticError(CVec &Y, Mat C) {
+
+	if (F_DEBUG) {
+		if (C.cols() != NUM_CLASSES || C.rows()!=Y.rows()) {
+			throw std::logic_error("Wrong probability matrix given to getProbabilisticError\n");
+		}
+
+	}
+
+	Mat copy(C);
+	for (int i = 0; i < C.rows();i++) {
+		if (std::isfinite(1.0/(double)C.row(i).sum() * C.row(i).maxCoeff())) {
+			C.row(i) = 1.0/(double)C.row(i).sum() * C.row(i);
+		} else {
+			C.row(i) = CVec::Ones(C.row(i).size()) / (double) C.row(i).size();
+		}
+	}
+
+	double sum = 0;
+	for (int i = 0; i < Y.rows(); i++) {
+		int correct = std::round(Y(i));
+		double d = C(i,correct);
+		sum += C(i,correct);
+	}
+
+	return 1 - sum/(double) Y.rows();
+}
+
+CVec getClassFreq(CVec M) {
+	CVec freq = CVec::Zero(NUM_CLASSES);
+	for (int i = 0; i < M.rows(); i++) {
+		freq[std::round(M(i))]++;
+	}
+	return freq;
 }

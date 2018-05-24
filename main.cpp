@@ -28,14 +28,25 @@ Mat localGlobal(Mat X, Mat Init, double alpha, double sigma){
 }
 
 
-double LGTest(Mat &X, Mat &Init, CVec &Y,  double alpha, double sigma){
+void LGTest(Mat &X, Mat &Init, CVec &Y, double* absError, double* probError,  double alpha, double sigma){
 		Mat res = localGlobal(X, Init, alpha, sigma);
-		std::cout << "Error for alpha=" << alpha <<",var=" <<
-				sigma << " is " << getErrorRate(Y, getClassification(res)) << std::endl;
+		CVec csfc = getClassification(res);
+		double error = getErrorRate(Y, csfc);
+		double prob_error = getProbabilisticError(Y, res);
+		//std::cout << "Error for alpha=" << alpha <<",var=" <<
+				//sigma << " is " << error << " / " << prob_error << std::endl;
+		//std::cout << getClassFreq(csfc) << std::endl;
 		//writeToFile(res,outputFile +
 		//		"result_" + std::to_string(alpha) + "_" + std::to_string(sigma) + ".txt");
-		return getErrorRate(Y, getClassification(res));
+		if (absError != NULL) {
+			*absError = error;
+		}
+		if (probError != NULL) {
+			*probError = prob_error;
+		}
 }
+
+
 
 typedef struct LGParams{
 	Mat& X;
@@ -52,8 +63,12 @@ my_f (const gsl_vector *v, void *params)
   sigma = gsl_vector_get(v,1);
 
   LGParams *p = (LGParams *)params;
+  double* error = (double*) malloc(sizeof(double));
+  LGTest(p->X, p->Init, p->Y,NULL,error, alpha, sigma);
 
-  return LGTest(p->X, p->Init, p->Y, alpha, sigma);
+  double e = *error;
+  free(error);
+  return e;
 }
 
 int GSLOptimize(Mat& X, Mat& Init, CVec& Y, double initAlpha, double initSigma) {
@@ -116,8 +131,8 @@ int GSLOptimize(Mat& X, Mat& Init, CVec& Y, double initAlpha, double initSigma) 
 }
 
 
-void go(){
-	std::srand(std::time(0)); //use current time as seed for random generator
+void go(int NUM_EXPERIMENT){
+	    std::srand(std::time(0)); //use current time as seed for random generator
 		Mat X;
 		CVec Y;
 		getInputMatrices(inputFile,setN, X,Y);
@@ -126,6 +141,14 @@ void go(){
 
 		std::cout << Map<CVec> (Y.data(),4) << std::endl;
 		std::cout << Map<Mat> (Init.data(),4,2) << std::endl;
+
+
+		LGTest(X, Init, Y, NULL,NULL,0.99,0.1);
+
+
+/*
+		build_KNN_Mat(X,  100);
+		return;
 
 
 		GSLOptimize(X,Init,Y,0.1,1);
@@ -155,27 +178,86 @@ void go(){
 		LGTest(X, Init, Y, 0.9,0.01);
 		LGTest(X, Init, Y, 0.9,0.005);
 
-/*
 		return;
-		Mat errMat(10,20);
+		*/
+
+		Mat errMat;
 		int i = 0;
 		int j = 0;
-		for (double alpha = 0.99; alpha <= 1; alpha += 0.1) {
-			j = 0;
-			for (double var = 0.05; var <= 1; var += 0.05) {
-				errMat(i,j) = LGTest(X, Init, Y, alpha, var);
-				j++;
-			}
-			i++;
+
+		std::vector<double> alphas({0,0.2,0.4,0.6,0.8});
+		std::vector<double> sigmas({0.05,0.1,0.15});
+
+		for (double alpha = 0.9; alpha < 1; alpha += 0.1) {
+			alphas.push_back(alpha);
 		}
-		std::cout << errMat << std::endl;
-*/
+		alphas.push_back(0.95);
+		alphas.push_back(0.99);
+		alphas.push_back(0.999);
+		alphas.push_back(0.9999);
+
+
+		for (double var = 0.2; var <= 1; var += 0.1) {
+			sigmas.push_back(var);
+		}
+		sigmas.push_back(2);
+		sigmas.push_back(4);
+
+
+		errMat.resize(alphas.size() * sigmas.size(),4);
+
+		double* abs_error = (double*) malloc(sizeof(double));
+		double* prob_error = (double*) malloc(sizeof(double));
+
+		for (int i = 0; i < alphas.size(); i++) {
+			for (int j = 0; j < sigmas.size(); j++) {
+				double alpha = alphas[i];
+				double sigma = sigmas[j];
+				std::cout << "|";
+				std::cout.flush();
+				errMat(i*sigmas.size() + j, 0) = alpha;
+				errMat(i*sigmas.size() + j, 1) = sigma;
+				LGTest(X, Init, Y, abs_error, prob_error, alpha, sigma);
+				errMat(i*sigmas.size() + j, 2) = *abs_error;
+				errMat(i*sigmas.size() + j, 3) = *prob_error;
+			}
+		}
+		std::cout<<std::endl;
+		free(abs_error);
+		free(prob_error);
+		std::ostringstream filename;
+		filename << outputFile <<  "set_" << setN << "_run_" << NUM_EXPERIMENT << "_samples_" << NUM_SAMPLES << "_error.txt" ;
+
+		std::ostringstream filename2;
+		filename2 << outputFile <<  "set_" << setN << "_run_" << NUM_EXPERIMENT <<  "_class.txt" ;
+
+		writeToFile(errMat, filename.str());
+		//writeToFile(errMat, filename2.str());
+
+		//std::cout << errMat << std::endl;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////
 
 int main (void) {
-	go();
+
+		std::vector<int> sets({1,3,4,5,6,7});
+	std::vector<int> samples({10,20,30,100});
+
+
+
+
+	for (int i = 1; i < 15; i++){
+		std::cout << i << std::endl;
+		for (int s = 0; s < sets.size(); s++) {
+			setN = sets[s];
+			for (int j = 0; j < samples.size(); j++) {
+				NUM_SAMPLES = samples[j];
+				go(i);
+			}
+		}
+	}
 	return 0;
 }
 
