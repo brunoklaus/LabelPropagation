@@ -12,7 +12,7 @@
 #define F_DEBUG false
 
 std::string inputFile("./INPUT_FILES/benchmark/");	//Endereco pasta com arquivos
-std::string outputFile("./OUTPUT_FILES/1/");  //endereço pasta saida
+std::string outputFile("./OUTPUT_FILES/2/");  //endereço pasta saida
 
 int setN = 2;
 int NUM_CLASSES = 2;

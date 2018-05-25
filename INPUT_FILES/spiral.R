@@ -1,7 +1,7 @@
 library(mlbench)
 setwd("/home/klaus/Downloads/eclipse-workspace/AAED_EIGEN/INPUT_FILES/")
 # 1 cycle each, no noise
-p<-mlbench.spirals(500,sd = 0.075,cycles = 1)
+p<-mlbench.spirals(1500,sd = 0.075,cycles = 1)
 plot(p)
 
 write.table(x = p$x,file = "./benchmark/SSL,set=0,X.tab",sep='\t',col.names=FALSE,row.names = FALSE)
@@ -29,7 +29,7 @@ for (i in 0:100) {
 }
 
 
-res <- data.frame(read.table("results.txt"))
+res <- data.frame(read.table("result_0.990000_0.010000.txt"))
 p2 <- p
 p2$x <- p$x
 p2$classes <- apply(res,1,function(x){

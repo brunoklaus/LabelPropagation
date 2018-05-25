@@ -58,6 +58,17 @@ void getInputMatrices(std::string inputFolder, int setN,Mat &X,  CVec &Y){
 			X(i,0) = entriesX[i];
 		}
 		X.resize(rows,cols);
+		for (int i = 0; i < cols; i++) {
+			double max = X.col(i).maxCoeff();
+			double min = X.col(i).minCoeff();
+			double r = max-min;
+			if (!std::isfinite(r)) {
+				X.col(i).setOnes();
+				X.col(i) = X.col(i) * 0.5;
+			} else {
+				X.col(i) = (X.col(i) - CVec::Constant(X.col(i).size(),min)) / r;
+			}
+		}
 
 		Y.resize(sizeY);
 		for (int i = 0; i < sizeY; i++) {
