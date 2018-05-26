@@ -26,7 +26,7 @@ std::string getFilename(int NUM_EXPERIMENT, std::string name){
 }
 
 
-Mat* localGlobal_Iter_test(Mat X, Mat Init, double alpha, double sigma, int numIter, bool writeResult = false){
+Mat localGlobal_Iter_test(Mat X, Mat Y, Mat Init, double alpha, double sigma, int numIter, bool writeResult = false){
 
 	Mat S = build_LG_S(X, sigma);
 	Mat I = Mat::Identity(S.rows(), S.rows());
@@ -35,10 +35,17 @@ Mat* localGlobal_Iter_test(Mat X, Mat Init, double alpha, double sigma, int numI
 	res = res.inverse();
 	res = res * Init;
 	res = (1 - alpha) * res;
+	CVec csfc = getClassification(res);
 
 	Mat F = Mat(Init);
+	CVec F_csfc =  getClassification(F);
+
 	CVec convergence_dist = CVec::Zero(numIter + 1);
+	CVec classification_dist = CVec::Zero(numIter + 1);
+
 	convergence_dist(0) = (res-Init).norm();
+	classification_dist(0) = getErrorRate(csfc,F_csfc);
+
 
 	for (int t = 0; t < numIter; t++)
 	{
@@ -49,15 +56,22 @@ Mat* localGlobal_Iter_test(Mat X, Mat Init, double alpha, double sigma, int numI
 			writeToFile(F,filename.str());
 		F = alpha*S*F + (1-alpha)*Init;
 		convergence_dist(t+1) = (res-F).norm();
+		F_csfc =  getClassification(F);
+		classification_dist(t+1) = getErrorRate(csfc,F_csfc);
 	}
 
-	std::ostringstream filename;
-	filename << outputFile <<  "convergence.txt";
+	std::ostringstream filename1,filename2,filename3;
+	filename1 << outputFile <<  "norm_dist.txt";
+	filename2 << outputFile <<  "classification_dist.txt";
+	filename3 << outputFile <<  "final.txt";
 
 
-	if(writeResult)
-		writeToFile(convergence_dist,filename.str());
-	return F;
+	if(writeResult){
+		writeToFile(convergence_dist,filename1.str());
+		writeToFile(classification_dist,filename2.str());
+		writeToFile(res,filename3.str());
+	}
+	return res;
 
 }
 
@@ -209,9 +223,27 @@ LG_GSL_Return GSLOptimize(Mat& X, Mat& Init, CVec& Y, double initAlpha, double i
 	    return r;
 }
 
-void readData(){
+void experiment_visualize(){
+	setN = 11;
+	NUM_SAMPLES = 2;
+	outputFile = "./OUTPUT_FILES/4/";
+	std::srand(std::time(0)); //use current time as seed for random generator
 
-
+	Mat X;
+	CVec Y;
+	getInputMatrices(inputFile,setN, X,Y);
+	Mat Init = getInitialProb(Y,getSamples(Y.rows(),NUM_SAMPLES,Y));
+	//LG_GSL_Return best = GSLOptimize(X,Init,Y,0.9,0.1);
+	//Mat res = localGlobal_Iter_test(X,Y,Init, best.alpha, best.sigma, 1000,true);
+	std::vector<int> ks({10,40,100,500});
+	for (int i = 0; i < ks.size();i++) {
+		AFFINITY_K = ks[i];
+		Mat res = localGlobal_Iter_test(X,Y,Init, 0.004, 0.01, 1000,true);
+		CVec csfc = getClassification(res);
+		std::cout << "ERROR : " << getErrorRate(Y,csfc) << std::endl;
+		int temp;
+		std::cin >> temp;
+	}
 
 }
 void experiment_convergence(){
@@ -223,7 +255,7 @@ void experiment_convergence(){
 	Mat Init = getInitialProb(Y,getSamples(Y.rows(),NUM_SAMPLES,Y));
 
 	LG_GSL_Return best = GSLOptimize(X,Init,Y,0.1,0.1);
-	localGlobal_Iter_test(X,Init, best.alpha, best.sigma, 30,true);
+	localGlobal_Iter_test(X,Y,Init, best.alpha, best.sigma, 100,true);
 }
 void experiment1_aux(int NUM_EXPERIMENT){
 
@@ -294,7 +326,7 @@ void experiment1(){
 	std::cout << "Indique qual set, bem como o id min e max para cada repeticao \n";
 	int chosenSet,minRun,maxRun;
 	std::cin >> chosenSet >> minRun >> maxRun;
-
+	sets.push_back(chosenSet);
 
 
 
@@ -362,7 +394,12 @@ void sometests(){
 ////////////////////////////////////////////////////////////////////////////
 
 int main (void) {
-
+	experiment_visualize(); return 0;
+	experiment1();
+	return 0;
+	setN = 0;
+	NUM_SAMPLES = 100;
+	experiment_convergence();
 	return 0;
 }
 

@@ -17,6 +17,8 @@ std::string outputFile("./OUTPUT_FILES/2/");  //endereço pasta saida
 int setN = 2;
 int NUM_CLASSES = 2;
 int NUM_SAMPLES = 100;
+int AFFINITY_K = -1;
+
 using namespace Eigen;
 
 
