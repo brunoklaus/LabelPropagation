@@ -2,9 +2,38 @@
 #include "globals.h"
 #include<limits>
 
+Mat restrict_Neighbours(Mat& W, int k, bool mutual = false) {
+	Mat K = Mat::Zero(W.rows(), W.rows());
+	for (int i = 0; i < W.rows(); i++) {
+		std::vector<std::pair<double,int> > distPairs;
+		CVec vec = W.row(i);
+		for (int j = 0; j < W.rows(); j++) {
+			if (j == i) continue;
+			//Joga o negativo da afinidade
+			distPairs.push_back(std::pair<double,int>(-vec[j],j));
+		}
+		std::sort(distPairs.begin(),distPairs.end());
+		for (int j = 0; j < k; j++) {
+			K(i,distPairs[j].second) = 1;
+			if(!mutual)K(distPairs[j].second,i) = 1;
+		}
+	}
 
+	if (mutual){
+		for (int i = 0; i < W.rows(); i++) {
+			for (int j = 0; j < W.rows(); j++) {
+				if (K(i,j)==0) {
+					K(j,i) = 0;
+				}
+			}
+		}
+	}
+	for (int i = 0; i < W.rows(); i++) {
+		W.row(i) = W.row(i).cwiseProduct(K.row(i));
+	}
+	return W;
+}
 
-Mat restrict_Neighbours(Mat& W, int k);
 
 Mat build_LG_S(Mat &X, double sigma, int k = -1){
 		if (k == -1) {
@@ -52,29 +81,101 @@ Mat build_LG_S(Mat &X, double sigma, int k = -1){
 
 		return (D*W*D);
 }
-
-Mat restrict_Neighbours(Mat& W, int k) {
-	Mat K = Mat::Zero(W.rows(), W.rows());
-	for (int i = 0; i < W.rows(); i++) {
-		std::vector<std::pair<double,int> > distPairs;
-		CVec vec = W.row(i);
-		for (int j = 0; j < W.rows(); j++) {
-			if (j == i) continue;
-			//Joga o negativo da afinidade
-			distPairs.push_back(std::pair<double,int>(-vec[j],j));
+Mat build_LG_W(Mat &X, double sigma, int k = -1){
+		if (k == -1) {
+			k = AFFINITY_K;
 		}
-		std::sort(distPairs.begin(),distPairs.end());
-		for (int j = 0; j < k; j++) {
-			K(i,distPairs[j].second) = 1;
-			K(distPairs[j].second,i) = 1;
-		}
-	}
 
-	for (int i = 0; i < W.rows(); i++) {
-		W.row(i) = W.row(i).cwiseProduct(K.row(i));
-	}
-	return W;
+		Mat W (X.rows(), X.rows());
+		Mat D = Mat::Zero(X.rows(), X.rows());
+
+		//Entradas j == i
+		for (int i = 0; i < X.rows(); i++) {
+			W(i,i) = 0;
+		}
+
+		//Entradas j < i
+		for (int i = 0; i < X.rows(); i++) {
+			for (int j = 0; j < i; j++) {
+				RVec v = (X.row(i) - X.row(j));
+				double d = std::exp(-v.squaredNorm() /(2*sigma*sigma) );
+				W(i,j) = d;
+			}
+		}
+
+		//Entradas j > i
+		for (int i = 0; i < X.rows(); i++) {
+			for (int j = i+1; j < X.rows(); j++) {
+				double d = W(j,i);
+				W(i,j) = d;
+			}
+		}
+		if (k > -1) {
+			W = restrict_Neighbours(W,k);
+		}
+		//D <- D^{-1/2}
+		for (int i = 0; i < X.rows(); i++) {
+			D(i,i) = W.row(i).sum();
+			if (D(i,i) == 0) {
+				D(i,i) = 1;
+			} else {
+				D(i,i) = 1.0/ std::sqrt(D(i,i));
+			}
+		}
+
+
+
+		return W;
 }
+
+
+Mat build_LG_D(Mat &X, double sigma, int k = -1){
+		if (k == -1) {
+			k = AFFINITY_K;
+		}
+
+		Mat W (X.rows(), X.rows());
+		Mat D = Mat::Zero(X.rows(), X.rows());
+
+		//Entradas j == i
+		for (int i = 0; i < X.rows(); i++) {
+			W(i,i) = 0;
+		}
+
+		//Entradas j < i
+		for (int i = 0; i < X.rows(); i++) {
+			for (int j = 0; j < i; j++) {
+				RVec v = (X.row(i) - X.row(j));
+				double d = std::exp(-v.squaredNorm() /(2*sigma*sigma) );
+				W(i,j) = d;
+			}
+		}
+
+		//Entradas j > i
+		for (int i = 0; i < X.rows(); i++) {
+			for (int j = i+1; j < X.rows(); j++) {
+				double d = W(j,i);
+				W(i,j) = d;
+			}
+		}
+		if (k > -1) {
+			W = restrict_Neighbours(W,k);
+		}
+		//D <- D^{-1/2}
+		for (int i = 0; i < X.rows(); i++) {
+			D(i,i) = W.row(i).sum();
+			if (D(i,i) == 0) {
+				D(i,i) = 1;
+			} else {
+				D(i,i) = 1.0/ std::sqrt(D(i,i));
+			}
+		}
+
+
+
+		return D;
+}
+
 
 Mat build_LG_P(Mat &X, double sigma){
 		Mat W (X.rows(), X.rows());
