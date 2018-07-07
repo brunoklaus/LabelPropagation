@@ -11,8 +11,8 @@
 #include <cmath>
 #define F_DEBUG false
 
-std::string inputFile("./INPUT_FILES/benchmark/");	//Endereco pasta com arquivos
-std::string outputFile("./OUTPUT_FILES/2/");  //endereço pasta saida
+std::string inputFolder("./INPUT_FILES/benchmark/");	//Endereco pasta com arquivos
+std::string outputFolder("./OUTPUT_FILES/2/");  //endereço pasta saida
 
 int setN = 2;
 int NUM_CLASSES = 2;
